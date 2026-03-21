@@ -1,6 +1,6 @@
 [package]
 name = "seggwat-cli"
-version = "0.17.1"
+version = "0.17.2"
 edition = "2024"
 authors = ["Hauke Jung <mail@haukejung.de>"]
 license = "MIT"
