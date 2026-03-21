@@ -12,9 +12,6 @@ The SeggWat CLI (`seggwat`) lets you manage feedback, projects, and ratings for 
 Install via one of these methods:
 
 ```bash
-# Homebrew (macOS & Linux)
-brew tap hauju/tap && brew install seggwat
-
 # crates.io
 cargo install seggwat-cli
 
