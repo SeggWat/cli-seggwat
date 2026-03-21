@@ -8,13 +8,6 @@ Manage feedback, projects, and ratings from the terminal. The official command-l
 
 ## Install
 
-**Homebrew (macOS & Linux):**
-
-```bash
-brew tap hauju/tap
-brew install seggwat
-```
-
 **crates.io:**
 
 ```bash
