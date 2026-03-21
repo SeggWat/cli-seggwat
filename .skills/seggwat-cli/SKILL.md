@@ -9,18 +9,11 @@ The SeggWat CLI (`seggwat`) lets you manage feedback, projects, and ratings for 
 
 ## Installation
 
-Install via one of these methods:
-
 ```bash
-# crates.io
 cargo install seggwat-cli
-
-# Shell script
-curl -fsSL https://seggwat.com/static/install.sh | sh
-
-# Pin a specific version
-VERSION=v0.17.2 curl -fsSL https://seggwat.com/static/install.sh | sh
 ```
+
+A shell-based installer is also available at `https://seggwat.com/static/install.sh` (supports pinning a version via `VERSION=v0.17.2`).
 
 Verify: `seggwat --version`
 
@@ -32,10 +25,10 @@ Two methods are available. Use API key for scripts/CI, OAuth for interactive use
 
 ```bash
 # Environment variable
-export SEGGWAT_API_KEY=oat_xxxxxxxxxxxxxxxxxxxxx
+export SEGGWAT_API_KEY=oat_<your-token>
 
 # Or inline flag
-seggwat --api-key oat_xxxxxxxxxxxxxxxxxxxxx project list
+seggwat --api-key oat_<your-token> project list
 ```
 
 API keys use the `oat_` prefix (Organization Access Token) and are created in the SeggWat Dashboard under Settings > API Tokens.
@@ -48,13 +41,7 @@ seggwat whoami         # Show current user
 seggwat logout         # Clear cached tokens
 ```
 
-For self-hosted instances:
-
-```bash
-seggwat --api-url https://feedback.yourcompany.com login \
-  --zitadel-domain auth.yourcompany.com \
-  --client-id YOUR_CLIENT_ID
-```
+For self-hosted instances, pass `--api-url`, `--zitadel-domain`, and `--client-id` to point at your own deployment.
 
 ## Global Options
 
@@ -187,7 +174,7 @@ seggwat rating list PROJECT_ID --type star --path "/pricing"
 
 ```bash
 # In your pipeline, create feedback from test results
-export SEGGWAT_API_KEY=oat_your_key
+export SEGGWAT_API_KEY=oat_<your-token>
 seggwat feedback create PROJECT_ID \
   --message "E2E test failure: checkout flow" \
   --type bug \
