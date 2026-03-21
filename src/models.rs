@@ -104,13 +104,17 @@ impl std::fmt::Display for RatingType {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum RatingValue {
-    Helpful { value: bool },
+    Helpful {
+        value: bool,
+    },
     Star {
         value: u8,
         #[serde(default = "default_max_stars")]
         max_stars: u8,
     },
-    Nps { value: u8 },
+    Nps {
+        value: u8,
+    },
 }
 
 fn default_max_stars() -> u8 {
