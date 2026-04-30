@@ -51,6 +51,7 @@ seggwat project list
 
 ## Features
 
+- **Interactive TUI** — `seggwat tui` opens a full-screen terminal UI with stats, triage, and editing
 - **Full feedback management** — list, create, update, delete, and view statistics
 - **Rating analytics** — helpful (thumbs up/down), star ratings, and NPS scores with visual charts
 - **Project overview** — list projects, view details, get summaries with stats
@@ -65,6 +66,7 @@ seggwat project list
 seggwat [OPTIONS] <COMMAND>
 
 Commands:
+  tui          Launch the interactive terminal UI
   project      Manage projects (alias: p)
   feedback     Manage feedback (alias: fb)
   rating       Manage ratings (alias: r)
@@ -79,6 +81,59 @@ Global Options:
   --json             Output as JSON
   -v, --verbose      Enable debug logging
 ```
+
+### Interactive TUI
+
+```bash
+seggwat tui                              # Project picker, then triage
+seggwat tui --project-id <project-id>    # Jump straight to a project
+```
+
+The TUI has three tabs per project:
+
+- **`0` Overview** — feedback totals + month-over-month trend, helpful %, star average and distribution, NPS score with histogram
+- **`1` Feedback** — list + detail panes, search, filters, status/type editing, compose new
+- **`2` Ratings** — list + detail panes, type and path filters
+
+**Common keys:**
+
+| Key | Action |
+|---|---|
+| `0` / `1` / `2` | Switch tab |
+| `↑` `↓` / `j` `k` | Navigate list |
+| `Tab` | Switch list ↔ detail pane |
+| `Enter` | Open project (Projects screen) |
+| `o` | Open selected item in browser |
+| `p` | Switch project (overlay) |
+| `r` | Refresh / reload stats |
+| `b` / `Esc` | Back to projects |
+| `?` | Help |
+| `q` / `Ctrl+C` | Quit |
+
+**Feedback tab:**
+
+| Key | Action |
+|---|---|
+| `N` | New feedback (compose, `Ctrl+S` to submit) |
+| `e` | Edit message of selected (`Ctrl+S` to save) |
+| `s` | Set status — choosing **Resolved** prompts for a resolution note |
+| `S` | Filter list by status |
+| `t` | Set type on selected |
+| `T` | Filter list by type |
+| `/` | Search messages |
+| `c` | Clear all filters |
+| `d` | Delete (with confirm) |
+| `n` | Next page |
+
+**Ratings tab:**
+
+| Key | Action |
+|---|---|
+| `t` | Filter by rating type (helpful / star / NPS) |
+| `P` | Filter by path |
+| `c` | Clear filters |
+| `d` | Delete (with confirm) |
+| `n` | Next page |
 
 ### Project Commands
 

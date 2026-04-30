@@ -5,6 +5,7 @@ mod commands;
 mod error;
 mod models;
 mod output;
+mod tui;
 
 use anyhow::{Result, bail};
 use clap::{CommandFactory, Parser};
@@ -17,9 +18,12 @@ use client::SeggwatClient;
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Initialize tracing
+    // Initialize tracing. TUI mode uses the alternate screen, so suppress
+    // log output (unless -v is set, in which case we assume the user wants it).
     let filter = if cli.verbose {
         EnvFilter::new("debug")
+    } else if matches!(cli.command, Commands::Tui { .. }) {
+        EnvFilter::new("off")
     } else {
         EnvFilter::new("info")
     };
@@ -93,6 +97,9 @@ async fn main() -> Result<()> {
         }
         Commands::Whoami => {
             commands::auth::execute_whoami(&client, json).await?;
+        }
+        Commands::Tui { project_id } => {
+            tui::run(client, cli.api_url.clone(), project_id).await?;
         }
         Commands::Completions { .. } | Commands::Login { .. } | Commands::Logout => {
             unreachable!("handled above")

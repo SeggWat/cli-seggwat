@@ -70,6 +70,12 @@ pub enum Commands {
     Logout,
     /// Show the currently authenticated user
     Whoami,
+    /// Launch the interactive terminal UI (TUI)
+    Tui {
+        /// Jump straight to this project's feedback (skips project picker)
+        #[arg(long)]
+        project_id: Option<String>,
+    },
     /// Generate shell completions
     Completions {
         /// Shell to generate completions for
