@@ -1,6 +1,6 @@
 [package]
 name = "seggwat-cli"
-version = "0.18.0"
+version = "0.19.0"
 edition = "2024"
 authors = ["Hauke Jung <mail@haukejung.de>"]
 license = "MIT"
@@ -27,7 +27,7 @@ tracing = { version = "0.1", default-features = false }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "json"] }
 anyhow = "1.0"
 comfy-table = "7"
-chrono = { version = "0.4", default-features = false, features = ["std", "now"] }
+chrono = { version = "0.4", default-features = false, features = ["std"] }
 sha2 = "0.10"
 base64 = "0.22"
 rand = "0.9"

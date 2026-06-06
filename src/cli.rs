@@ -57,15 +57,7 @@ pub enum Commands {
         command: RatingCommand,
     },
     /// Log in with your SeggWat account (opens browser)
-    Login {
-        /// Zitadel domain (auto-detected for seggwat.com, required for self-hosted)
-        #[arg(long, env = "SEGGWAT_ZITADEL_DOMAIN")]
-        zitadel_domain: Option<String>,
-
-        /// OAuth client ID (auto-detected for seggwat.com, required for self-hosted)
-        #[arg(long, env = "SEGGWAT_CLIENT_ID")]
-        client_id: Option<String>,
-    },
+    Login,
     /// Log out and clear cached tokens
     Logout,
     /// Show the currently authenticated user

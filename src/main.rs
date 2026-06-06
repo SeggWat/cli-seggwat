@@ -38,16 +38,8 @@ async fn main() -> Result<()> {
             clap_complete::generate(*shell, &mut cmd, "seggwat", &mut std::io::stdout());
             return Ok(());
         }
-        Commands::Login {
-            zitadel_domain,
-            client_id,
-        } => {
-            return commands::auth::execute_login(
-                &cli.api_url,
-                zitadel_domain.as_deref(),
-                client_id.as_deref(),
-            )
-            .await;
+        Commands::Login => {
+            return commands::auth::execute_login(&cli.api_url).await;
         }
         Commands::Logout => {
             return commands::auth::execute_logout();
@@ -62,22 +54,8 @@ async fn main() -> Result<()> {
         }
         SeggwatClient::with_api_key(&cli.api_url, api_key)?
     } else if let Some(token_store) = auth::load_tokens()? {
-        let store = if auth::is_expired(&token_store) {
-            tracing::debug!("Access token expired, attempting refresh...");
-            match auth::refresh_access_token(&token_store).await {
-                Ok(refreshed) => {
-                    tracing::debug!("Token refreshed successfully");
-                    refreshed
-                }
-                Err(e) => {
-                    tracing::debug!("Token refresh failed: {e}");
-                    bail!("Session expired. Run `seggwat login` to re-authenticate.");
-                }
-            }
-        } else {
-            token_store
-        };
-        SeggwatClient::with_bearer_token(&cli.api_url, store.access_token)?
+        // `seggwat login` stores a long-lived `oat_` token; use it like an API key.
+        SeggwatClient::with_api_key(&cli.api_url, token_store.access_token)?
     } else {
         bail!(
             "Not authenticated. Run `seggwat login` or set --api-key / SEGGWAT_API_KEY environment variable."
@@ -101,7 +79,7 @@ async fn main() -> Result<()> {
         Commands::Tui { project_id } => {
             tui::run(client, cli.api_url.clone(), project_id).await?;
         }
-        Commands::Completions { .. } | Commands::Login { .. } | Commands::Logout => {
+        Commands::Completions { .. } | Commands::Login | Commands::Logout => {
             unreachable!("handled above")
         }
     }

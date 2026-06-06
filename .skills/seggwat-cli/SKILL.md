@@ -41,7 +41,7 @@ seggwat whoami         # Show current user
 seggwat logout         # Clear cached tokens
 ```
 
-For self-hosted instances, pass `--api-url`, `--zitadel-domain`, and `--client-id` to point at your own deployment.
+For self-hosted instances, pass `--api-url` to point at your own deployment.
 
 ## Global Options
 

@@ -27,9 +27,6 @@ pub enum CliError {
     #[error("Failed to build HTTP client: {0}")]
     ClientBuild(String),
 
-    #[error("Token refresh failed: {message}")]
-    TokenRefreshFailed { message: String },
-
     #[error("Login failed: {message}")]
     LoginFailed { message: String },
 

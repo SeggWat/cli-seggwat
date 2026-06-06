@@ -1,6 +1,5 @@
 //! OAuth Authorization Code + PKCE flow and token storage.
 
-use std::io::{BufRead, BufReader, Write as IoWrite};
 use std::path::PathBuf;
 
 use base64::Engine;
@@ -13,27 +12,22 @@ use tokio::net::TcpListener;
 use crate::client::build_http_client;
 use crate::error::CliError;
 
-/// Stored OAuth tokens.
+/// Stored credential obtained via `seggwat login`.
+///
+/// The dashboard's token endpoint mints a long-lived `oat_` organization access
+/// token (no refresh token, no expiry), so this is effectively a
+/// browser-acquired API key.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenStore {
     pub access_token: String,
-    pub refresh_token: Option<String>,
-    /// Unix timestamp when the access token expires.
-    pub expires_at: Option<i64>,
-    /// The API URL these tokens are for.
+    /// The API URL this token was issued for.
     pub api_url: String,
-    /// Zitadel domain (needed for token refresh).
-    pub zitadel_domain: String,
-    /// OAuth client ID (needed for token refresh).
-    pub client_id: String,
 }
 
-/// Token endpoint response from Zitadel.
+/// Token endpoint success response.
 #[derive(Debug, Deserialize)]
 struct TokenResponse {
     access_token: String,
-    refresh_token: Option<String>,
-    expires_in: Option<i64>,
 }
 
 /// Token endpoint error response.
@@ -112,17 +106,6 @@ pub fn clear_tokens() -> Result<(), CliError> {
     Ok(())
 }
 
-/// Check whether the stored access token has expired.
-pub fn is_expired(store: &TokenStore) -> bool {
-    match store.expires_at {
-        Some(exp) => {
-            let now = chrono::Utc::now().timestamp();
-            now >= (exp - 30) // 30-second buffer
-        }
-        None => false, // No expiry info — assume valid
-    }
-}
-
 // ============================================================================
 // PKCE
 // ============================================================================
@@ -150,49 +133,45 @@ pub fn generate_state() -> String {
 // Login Flow
 // ============================================================================
 
-/// Run the full OAuth Authorization Code + PKCE login flow.
+/// OAuth client identifier sent to the dashboard's authorization server. The
+/// dashboard does not treat the client_id value as a security control (the real
+/// boundaries are the redirect_uri allowlist, the user's session, consent, and
+/// PKCE), so a fixed identifier works for every instance.
+const CLIENT_ID: &str = "seggwat-cli";
+
+/// Run the OAuth Authorization Code + PKCE login flow against the dashboard's
+/// own authorization server (`/oauth/authorize` + `/oauth/token`).
 ///
 /// 1. Generate PKCE verifier/challenge and random state
-/// 2. Start a local callback server
-/// 3. Open browser to authorize URL
-/// 4. Wait for callback with auth code
-/// 5. Exchange code for tokens
-/// 6. Save and return tokens
-pub async fn login(
-    api_url: &str,
-    zitadel_domain: &str,
-    client_id: &str,
-) -> Result<TokenStore, CliError> {
+/// 2. Start a local callback server on a loopback `/callback`
+/// 3. Open the browser to the authorize URL
+/// 4. Wait for the callback with the auth code
+/// 5. Exchange the code for a long-lived `oat_` access token
+/// 6. Save and return it
+pub async fn login(api_url: &str) -> Result<TokenStore, CliError> {
+    let api_url = api_url.trim_end_matches('/');
     let (verifier, challenge) = generate_pkce();
     let state = generate_state();
 
-    // Bind to a random available port on localhost
+    // Bind a loopback callback server. The dashboard's redirect_uri allowlist
+    // requires a loopback host with the path exactly `/callback` and no query.
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .map_err(|e| CliError::LoginFailed {
             message: format!("Failed to bind callback server: {e}"),
         })?;
     let port = listener.local_addr().unwrap().port();
-    let redirect_uri = format!("http://localhost:{port}");
+    let redirect_uri = format!("http://127.0.0.1:{port}/callback");
 
-    // Build the authorize URL
-    let scheme = if zitadel_domain.starts_with("localhost") || zitadel_domain.starts_with("127.") {
-        "http"
-    } else {
-        "https"
-    };
-    let scopes = "openid profile email offline_access urn:zitadel:iam:org:project:id:zitadel:aud";
     let authorize_url = format!(
-        "{scheme}://{zitadel_domain}/oauth/v2/authorize?\
-         client_id={client_id}\
+        "{api_url}/oauth/authorize?\
+         response_type=code\
+         &client_id={CLIENT_ID}\
          &redirect_uri={}\
-         &response_type=code\
-         &scope={}\
          &code_challenge={challenge}\
          &code_challenge_method=S256\
          &state={state}",
         urlencoding::encode(&redirect_uri),
-        urlencoding::encode(scopes),
     );
 
     // Try to open browser, print URL as fallback
@@ -207,14 +186,14 @@ pub async fn login(
     // Wait for the callback (120s timeout)
     let code = wait_for_callback(listener, &state).await?;
 
-    // Exchange the authorization code for tokens
-    let token_url = format!("{scheme}://{zitadel_domain}/oauth/v2/token");
+    // Exchange the authorization code for an access token
+    let token_url = format!("{api_url}/oauth/token");
     let http_client = build_http_client()?;
     let resp = http_client
         .post(&token_url)
         .form(&[
             ("grant_type", "authorization_code"),
-            ("client_id", client_id),
+            ("client_id", CLIENT_ID),
             ("code", &code),
             ("redirect_uri", &redirect_uri),
             ("code_verifier", &verifier),
@@ -241,17 +220,9 @@ pub async fn login(
         message: format!("Failed to parse token response: {e}"),
     })?;
 
-    let expires_at = token_resp
-        .expires_in
-        .map(|secs| chrono::Utc::now().timestamp() + secs);
-
     let store = TokenStore {
         access_token: token_resp.access_token,
-        refresh_token: token_resp.refresh_token,
-        expires_at,
         api_url: api_url.to_string(),
-        zitadel_domain: zitadel_domain.to_string(),
-        client_id: client_id.to_string(),
     };
 
     save_tokens(&store)?;
@@ -259,105 +230,110 @@ pub async fn login(
 }
 
 /// Wait for the OAuth callback on the local server.
+///
+/// Browsers frequently pre-open speculative TCP connections that carry no
+/// request, so we loop over `accept()` and skip any connection that doesn't
+/// carry our callback query, until the real redirect arrives or the overall
+/// 120s deadline elapses.
 async fn wait_for_callback(
     listener: TcpListener,
     expected_state: &str,
 ) -> Result<String, CliError> {
-    let timeout = tokio::time::Duration::from_secs(120);
+    use tokio::io::{AsyncBufReadExt, BufReader};
 
-    let (stream, _) = tokio::time::timeout(timeout, listener.accept())
-        .await
-        .map_err(|_| CliError::LoginTimeout)?
-        .map_err(|e| CliError::LoginFailed {
-            message: format!("Failed to accept callback connection: {e}"),
+    let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_secs(120);
+
+    loop {
+        let (mut stream, _) = tokio::time::timeout_at(deadline, listener.accept())
+            .await
+            .map_err(|_| CliError::LoginTimeout)?
+            .map_err(|e| CliError::LoginFailed {
+                message: format!("Failed to accept callback connection: {e}"),
+            })?;
+
+        // Read just the request line; the rest of the request is irrelevant.
+        let mut request_line = String::new();
+        {
+            let mut reader = BufReader::new(&mut stream);
+            if reader.read_line(&mut request_line).await.is_err() || request_line.trim().is_empty() {
+                continue; // stray pre-connect with no data — keep waiting
+            }
+        }
+
+        // Parse: GET /callback?code=xxx&state=yyy HTTP/1.1
+        let Some(path) = request_line.split_whitespace().nth(1) else {
+            continue;
+        };
+        let query = path.split_once('?').map(|(_, q)| q).unwrap_or("");
+        let params: std::collections::HashMap<String, String> = query
+            .split('&')
+            .filter_map(|pair| pair.split_once('='))
+            .map(|(k, v)| {
+                (
+                    urlencoding::decode(k)
+                        .unwrap_or_else(|_| k.into())
+                        .into_owned(),
+                    urlencoding::decode(v)
+                        .unwrap_or_else(|_| v.into())
+                        .into_owned(),
+                )
+            })
+            .collect();
+
+        // Connections without our callback params (favicon, preconnect, etc.)
+        // are not the redirect we're waiting for — answer and keep listening.
+        if !params.contains_key("code") && !params.contains_key("error") {
+            send_http_response(&mut stream, "404 Not Found", "<html><body>Not found.</body></html>")
+                .await;
+            continue;
+        }
+
+        // Error response from the authorization server.
+        if let Some(error) = params.get("error") {
+            let unknown = "Unknown error".to_string();
+            let desc = params.get("error_description").unwrap_or(&unknown);
+            let html = format!(
+                "<html><body><h1>Login Failed</h1><p>{desc}</p><p>You can close this tab.</p></body></html>"
+            );
+            send_http_response(&mut stream, "400 Bad Request", &html).await;
+            return Err(CliError::LoginFailed {
+                message: format!("{error}: {desc}"),
+            });
+        }
+
+        // Verify state (CSRF).
+        let received_state = params.get("state").ok_or_else(|| CliError::LoginFailed {
+            message: "Missing state parameter in callback".to_string(),
         })?;
+        if received_state.as_str() != expected_state {
+            let html = "<html><body><h1>Login Failed</h1><p>State mismatch (possible CSRF). Please try again.</p></body></html>";
+            send_http_response(&mut stream, "400 Bad Request", html).await;
+            return Err(CliError::LoginFailed {
+                message: "State parameter mismatch — possible CSRF attack".to_string(),
+            });
+        }
 
-    // Convert to std for synchronous reading (single request, simple parsing)
-    let std_stream = stream.into_std().map_err(|e| CliError::LoginFailed {
-        message: format!("Stream conversion failed: {e}"),
-    })?;
-    std_stream
-        .set_read_timeout(Some(std::time::Duration::from_secs(5)))
-        .ok();
+        // Extract authorization code.
+        let code = params
+            .get("code")
+            .ok_or_else(|| CliError::LoginFailed {
+                message: "Missing authorization code in callback".to_string(),
+            })?
+            .to_string();
 
-    let mut reader = BufReader::new(&std_stream);
-    let mut request_line = String::new();
-    reader
-        .read_line(&mut request_line)
-        .map_err(|e| CliError::LoginFailed {
-            message: format!("Failed to read callback request: {e}"),
-        })?;
+        let html = "<html><body>\
+            <h1>Login Successful</h1>\
+            <p>You can close this tab and return to the terminal.</p>\
+            </body></html>";
+        send_http_response(&mut stream, "200 OK", html).await;
 
-    // Parse: GET /callback?code=xxx&state=yyy HTTP/1.1
-    let path = request_line
-        .split_whitespace()
-        .nth(1)
-        .ok_or_else(|| CliError::LoginFailed {
-            message: "Invalid callback request".to_string(),
-        })?;
-
-    let query = path.split_once('?').map(|(_, q)| q).unwrap_or("");
-
-    let params: std::collections::HashMap<String, String> = query
-        .split('&')
-        .filter_map(|pair| pair.split_once('='))
-        .map(|(k, v)| {
-            (
-                urlencoding::decode(k)
-                    .unwrap_or_else(|_| k.into())
-                    .into_owned(),
-                urlencoding::decode(v)
-                    .unwrap_or_else(|_| v.into())
-                    .into_owned(),
-            )
-        })
-        .collect();
-
-    // Check for error response
-    let unknown = "Unknown error".to_string();
-    if let Some(error) = params.get("error") {
-        let desc = params.get("error_description").unwrap_or(&unknown);
-        let html = format!(
-            "<html><body><h1>Login Failed</h1><p>{desc}</p><p>You can close this tab.</p></body></html>"
-        );
-        send_http_response(&std_stream, "400 Bad Request", &html);
-        return Err(CliError::LoginFailed {
-            message: format!("{error}: {desc}"),
-        });
+        return Ok(code);
     }
-
-    // Verify state
-    let received_state = params.get("state").ok_or_else(|| CliError::LoginFailed {
-        message: "Missing state parameter in callback".to_string(),
-    })?;
-
-    if *received_state != expected_state {
-        let html = "<html><body><h1>Login Failed</h1><p>State mismatch (possible CSRF). Please try again.</p></body></html>";
-        send_http_response(&std_stream, "400 Bad Request", html);
-        return Err(CliError::LoginFailed {
-            message: "State parameter mismatch — possible CSRF attack".to_string(),
-        });
-    }
-
-    // Extract authorization code
-    let code = params
-        .get("code")
-        .ok_or_else(|| CliError::LoginFailed {
-            message: "Missing authorization code in callback".to_string(),
-        })?
-        .to_string();
-
-    let html = "<html><body>\
-        <h1>Login Successful</h1>\
-        <p>You can close this tab and return to the terminal.</p>\
-        </body></html>";
-    send_http_response(&std_stream, "200 OK", html);
-
-    Ok(code)
 }
 
 /// Send a minimal HTTP response.
-fn send_http_response(stream: &std::net::TcpStream, status: &str, body: &str) {
+async fn send_http_response(stream: &mut tokio::net::TcpStream, status: &str, body: &str) {
+    use tokio::io::AsyncWriteExt;
     let response = format!(
         "HTTP/1.1 {status}\r\n\
          Content-Type: text/html; charset=utf-8\r\n\
@@ -367,79 +343,6 @@ fn send_http_response(stream: &std::net::TcpStream, status: &str, body: &str) {
          {body}",
         body.len()
     );
-    let mut writer = std::io::BufWriter::new(stream);
-    let _ = writer.write_all(response.as_bytes());
-    let _ = writer.flush();
-}
-
-// ============================================================================
-// Token Refresh
-// ============================================================================
-
-/// Refresh the access token using the stored refresh token.
-pub async fn refresh_access_token(store: &TokenStore) -> Result<TokenStore, CliError> {
-    let refresh_token = store
-        .refresh_token
-        .as_deref()
-        .ok_or(CliError::TokenRefreshFailed {
-            message: "No refresh token available".to_string(),
-        })?;
-
-    let scheme = if store.zitadel_domain.starts_with("localhost")
-        || store.zitadel_domain.starts_with("127.")
-    {
-        "http"
-    } else {
-        "https"
-    };
-    let token_url = format!("{scheme}://{}/oauth/v2/token", store.zitadel_domain);
-
-    let http_client = build_http_client()?;
-    let resp = http_client
-        .post(&token_url)
-        .form(&[
-            ("grant_type", "refresh_token"),
-            ("client_id", &store.client_id),
-            ("refresh_token", refresh_token),
-        ])
-        .send()
-        .await
-        .map_err(|e| CliError::TokenRefreshFailed {
-            message: format!("Refresh request failed: {e}"),
-        })?;
-
-    if !resp.status().is_success() {
-        let err: TokenErrorResponse = resp.json().await.unwrap_or(TokenErrorResponse {
-            error: "unknown".to_string(),
-            error_description: Some("Token refresh failed".to_string()),
-        });
-        return Err(CliError::TokenRefreshFailed {
-            message: err
-                .error_description
-                .unwrap_or_else(|| "Token refresh failed".to_string()),
-        });
-    }
-
-    let token_resp: TokenResponse =
-        resp.json()
-            .await
-            .map_err(|e| CliError::TokenRefreshFailed {
-                message: format!("Failed to parse refresh response: {e}"),
-            })?;
-
-    let expires_at = token_resp
-        .expires_in
-        .map(|secs| chrono::Utc::now().timestamp() + secs);
-
-    let new_store = TokenStore {
-        access_token: token_resp.access_token,
-        refresh_token: token_resp.refresh_token.or(store.refresh_token.clone()),
-        expires_at,
-        api_url: store.api_url.clone(),
-        zitadel_domain: store.zitadel_domain.clone(),
-        client_id: store.client_id.clone(),
-    };
-
-    save_tokens(&new_store)?;
-    Ok(new_store)
+    let _ = stream.write_all(response.as_bytes()).await;
+    let _ = stream.flush().await;
 }
