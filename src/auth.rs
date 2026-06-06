@@ -255,7 +255,8 @@ async fn wait_for_callback(
         let mut request_line = String::new();
         {
             let mut reader = BufReader::new(&mut stream);
-            if reader.read_line(&mut request_line).await.is_err() || request_line.trim().is_empty() {
+            if reader.read_line(&mut request_line).await.is_err() || request_line.trim().is_empty()
+            {
                 continue; // stray pre-connect with no data — keep waiting
             }
         }
@@ -283,8 +284,12 @@ async fn wait_for_callback(
         // Connections without our callback params (favicon, preconnect, etc.)
         // are not the redirect we're waiting for — answer and keep listening.
         if !params.contains_key("code") && !params.contains_key("error") {
-            send_http_response(&mut stream, "404 Not Found", "<html><body>Not found.</body></html>")
-                .await;
+            send_http_response(
+                &mut stream,
+                "404 Not Found",
+                "<html><body>Not found.</body></html>",
+            )
+            .await;
             continue;
         }
 
