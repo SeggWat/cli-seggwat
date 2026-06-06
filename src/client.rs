@@ -20,19 +20,12 @@ use crate::models::{
     Rating, RatingListResponse, StarStats, WhoamiResponse,
 };
 
-/// Authentication method for the client.
-#[derive(Clone)]
-enum AuthMethod {
-    ApiKey(String),
-    Bearer(String),
-}
-
 /// Client for the SeggWat REST API.
 #[derive(Clone)]
 pub struct SeggwatClient {
     client: Client,
     base_url: String,
-    auth: AuthMethod,
+    api_key: String,
 }
 
 impl SeggwatClient {
@@ -50,22 +43,7 @@ impl SeggwatClient {
         Ok(Self {
             client,
             base_url: format!("{base}/api/v1"),
-            auth: AuthMethod::ApiKey(api_key.into()),
-        })
-    }
-
-    /// Create a new client authenticated with a Bearer token.
-    pub fn with_bearer_token(
-        base_url: impl Into<String>,
-        token: impl Into<String>,
-    ) -> Result<Self, CliError> {
-        let base = base_url.into();
-        let base = base.trim_end_matches('/');
-        let client = Self::build_http_client()?;
-        Ok(Self {
-            client,
-            base_url: format!("{base}/api/v1"),
-            auth: AuthMethod::Bearer(token.into()),
+            api_key: api_key.into(),
         })
     }
 
@@ -126,10 +104,7 @@ impl SeggwatClient {
     }
 
     fn auth(&self, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-        match &self.auth {
-            AuthMethod::ApiKey(key) => req.header("X-API-Key", key),
-            AuthMethod::Bearer(token) => req.header("Authorization", format!("Bearer {token}")),
-        }
+        req.header("X-API-Key", &self.api_key)
     }
 
     // ========================================================================

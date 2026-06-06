@@ -176,7 +176,7 @@ seggwat rating stats <project-id> --type nps               # NPS score breakdown
 seggwat login
 ```
 
-Opens your browser for authentication. Tokens are cached at `~/.config/seggwat/tokens.json` with automatic refresh.
+Opens your browser for authentication. The resulting access token is a long-lived organization token, cached at `~/.config/seggwat/tokens.json`.
 
 ### API Key (Non-Interactive)
 
@@ -193,9 +193,7 @@ Generate API keys in the [SeggWat Dashboard](https://seggwat.com) under Organiza
 ### Self-Hosted
 
 ```bash
-seggwat --api-url https://feedback.yourcompany.com login \
-  --zitadel-domain auth.yourcompany.com \
-  --client-id YOUR_CLIENT_ID
+seggwat --api-url https://feedback.yourcompany.com login
 ```
 
 ## Shell Completions
