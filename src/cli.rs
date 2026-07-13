@@ -56,6 +56,12 @@ pub enum Commands {
         #[command(subcommand)]
         command: RatingCommand,
     },
+    /// Manage review tasks (extension / on-page review mode)
+    #[command(alias = "rev")]
+    Review {
+        #[command(subcommand)]
+        command: ReviewCommand,
+    },
     /// Log in with your SeggWat account (opens browser)
     Login,
     /// Log out and clear cached tokens
@@ -249,8 +255,217 @@ pub enum RatingCommand {
 }
 
 // ============================================================================
+// Review Task Commands
+// ============================================================================
+
+#[derive(Subcommand, Debug)]
+pub enum ReviewCommand {
+    /// List review tasks for a project
+    #[command(alias = "ls")]
+    List {
+        /// Project ID
+        project_id: String,
+
+        /// Filter by status
+        #[arg(long)]
+        status: Option<ReviewTaskStatusArg>,
+    },
+    /// Get a review task
+    Get {
+        /// Project ID
+        project_id: String,
+        /// Review task ID
+        task_id: String,
+    },
+    /// List the annotations (on-page pins) left on a review task
+    Comments {
+        /// Project ID
+        project_id: String,
+        /// Review task ID
+        task_id: String,
+    },
+    /// Create a review task
+    Create {
+        /// Project ID
+        project_id: String,
+
+        /// Task title (what to review)
+        #[arg(short, long)]
+        title: String,
+
+        /// Instructions for the reviewer
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Page URL the task refers to
+        #[arg(long)]
+        url: Option<String>,
+    },
+    /// Update a review task (partial; pass "" to clear description/url)
+    Update {
+        /// Project ID
+        project_id: String,
+        /// Review task ID
+        task_id: String,
+
+        /// Updated title
+        #[arg(short, long)]
+        title: Option<String>,
+
+        /// Updated description ("" clears it)
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Updated URL ("" clears it)
+        #[arg(long)]
+        url: Option<String>,
+
+        /// Updated status
+        #[arg(long)]
+        status: Option<ReviewTaskStatusArg>,
+    },
+    /// Delete a review task (its comments survive in feedback)
+    #[command(alias = "rm")]
+    Delete {
+        /// Project ID
+        project_id: String,
+        /// Review task ID
+        task_id: String,
+    },
+    /// Resolve an annotation — mark a pin fixed
+    Resolve {
+        /// Project ID
+        project_id: String,
+        /// Annotation (feedback) ID from `review comments`
+        feedback_id: String,
+    },
+    /// Reopen a resolved annotation
+    Reopen {
+        /// Project ID
+        project_id: String,
+        /// Annotation (feedback) ID from `review comments`
+        feedback_id: String,
+    },
+    /// Serve a local proxy so your dev app can drop review pins on this project
+    ///
+    /// Runs a tiny localhost server that forwards the review widget's API calls
+    /// to SeggWat with a trusted Origin, so you can annotate a local dev app
+    /// without adding its origin to the project's allowed-origins list.
+    Serve {
+        /// Project ID
+        project_id: String,
+
+        /// Port to listen on
+        #[arg(long, default_value = "7777")]
+        port: u16,
+
+        /// Origin to forward (defaults to the project's first allowed origin)
+        #[arg(long)]
+        origin: Option<String>,
+    },
+    /// Account-free local review loop backed by ./.review/ JSON (no SeggWat needed)
+    Local {
+        #[command(subcommand)]
+        command: LocalReviewCommand,
+    },
+}
+
+// ============================================================================
+// Local Review Commands (no account / no project — storage in ./.review/)
+// ============================================================================
+
+#[derive(Subcommand, Debug)]
+pub enum LocalReviewCommand {
+    /// Serve the review widget locally, storing pins in ./.review/
+    Serve {
+        /// Port to listen on
+        #[arg(long, default_value = "7777")]
+        port: u16,
+    },
+    /// List local review tasks
+    #[command(alias = "ls")]
+    List,
+    /// Get a local review task
+    Get {
+        /// Review task ID
+        task_id: String,
+    },
+    /// List the annotations (on-page pins) on a local review task
+    Comments {
+        /// Review task ID
+        task_id: String,
+    },
+    /// Create a local review task
+    Create {
+        /// Task title (what to review)
+        #[arg(short, long)]
+        title: String,
+
+        /// Instructions for the reviewer
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Page URL the task refers to
+        #[arg(long)]
+        url: Option<String>,
+    },
+    /// Update a local review task (partial; pass "" to clear description/url)
+    Update {
+        /// Review task ID
+        task_id: String,
+
+        /// Updated title
+        #[arg(short, long)]
+        title: Option<String>,
+
+        /// Updated description ("" clears it)
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Updated URL ("" clears it)
+        #[arg(long)]
+        url: Option<String>,
+
+        /// Updated status
+        #[arg(long)]
+        status: Option<ReviewTaskStatusArg>,
+    },
+    /// Delete a local review task
+    #[command(alias = "rm")]
+    Delete {
+        /// Review task ID
+        task_id: String,
+    },
+    /// Resolve a local annotation — mark a pin fixed
+    Resolve {
+        /// Annotation ID from `review local comments`
+        feedback_id: String,
+    },
+    /// Reopen a resolved local annotation
+    Reopen {
+        /// Annotation ID from `review local comments`
+        feedback_id: String,
+    },
+}
+
+// ============================================================================
 // Value Enums for CLI arguments
 // ============================================================================
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum ReviewTaskStatusArg {
+    Open,
+    Done,
+}
+
+impl std::fmt::Display for ReviewTaskStatusArg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Open => write!(f, "open"),
+            Self::Done => write!(f, "done"),
+        }
+    }
+}
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum FeedbackStatusArg {

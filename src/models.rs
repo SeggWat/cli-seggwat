@@ -190,6 +190,20 @@ pub struct Feedback {
     pub submitted_by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub resolution_note: Option<String>,
+    /// On-page pin anchor, present when this feedback is a review-task annotation.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub pin_anchor: Option<PinAnchor>,
+}
+
+/// The pinned-element anchor carried by a review-task annotation. Only the
+/// fields the CLI displays are modelled; the rest of the anchor is ignored.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PinAnchor {
+    /// CSS selector of the pinned element.
+    pub selector: String,
+    /// Freehand markup drawn for this pin (empty for a plain point pin).
+    #[serde(default)]
+    pub shapes: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -268,6 +282,56 @@ pub struct FeedbackUpdateRequest {
     pub status: Option<FeedbackStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resolution_note: Option<String>,
+}
+
+// ============================================================================
+// Review Tasks
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewTask {
+    pub id: String,
+    pub project_id: String,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub url: Option<String>,
+    /// "open" or "done".
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// One row of the review-task list: the task plus its annotation count.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewTaskListItem {
+    pub task: ReviewTask,
+    pub feedback_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ReviewTaskCreateRequest {
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ReviewTaskUpdateRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// `""` clears the description.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// `""` clears the url.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// "open" or "done".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
 }
 
 // ============================================================================

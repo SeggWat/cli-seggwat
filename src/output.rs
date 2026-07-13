@@ -4,8 +4,9 @@ use comfy_table::{Cell, ContentArrangement, Table, presets::UTF8_FULL_CONDENSED}
 use serde::Serialize;
 
 use crate::models::{
-    Feedback, FeedbackCounts, HelpfulStats, NpsStats, PaginationInfo, Project, ProjectSummary,
-    Rating, StarStats, WhoamiResponse, format_rating_value,
+    Feedback, FeedbackCounts, FeedbackStatus, HelpfulStats, NpsStats, PaginationInfo, Project,
+    ProjectSummary, Rating, ReviewTask, ReviewTaskListItem, StarStats, WhoamiResponse,
+    format_rating_value,
 };
 
 /// Print any serializable value as pretty JSON.
@@ -248,6 +249,80 @@ pub fn print_nps_stats(stats: &NpsStats) {
     println!("Promoters:  {} (9-10)", stats.promoters);
     println!("Passives:   {} (7-8)", stats.passives);
     println!("Detractors: {} (0-6)", stats.detractors);
+}
+
+// ============================================================================
+// Review Tasks
+// ============================================================================
+
+pub fn print_review_task_table(items: &[ReviewTaskListItem]) {
+    if items.is_empty() {
+        println!("No review tasks found.");
+        return;
+    }
+
+    let mut table = new_table();
+    table.set_header(vec!["ID", "Status", "Title", "Pins", "Created"]);
+
+    for item in items {
+        table.add_row(vec![
+            Cell::new(&item.task.id),
+            Cell::new(&item.task.status),
+            Cell::new(truncate(&item.task.title, 50)),
+            Cell::new(item.feedback_count),
+            Cell::new(format_timestamp(&item.task.created_at)),
+        ]);
+    }
+
+    println!("{table}");
+}
+
+pub fn print_review_task_detail(task: &ReviewTask) {
+    println!("ID:          {}", task.id);
+    println!("Project:     {}", task.project_id);
+    println!("Title:       {}", task.title);
+    println!("Status:      {}", task.status);
+    if let Some(desc) = &task.description {
+        println!("Description: {desc}");
+    }
+    if let Some(url) = &task.url {
+        println!("URL:         {url}");
+    }
+    println!("Created:     {}", format_timestamp(&task.created_at));
+    println!("Updated:     {}", format_timestamp(&task.updated_at));
+}
+
+/// The on-page pins left on a review task, in the order reviewers dropped them.
+pub fn print_review_comments_table(comments: &[Feedback]) {
+    if comments.is_empty() {
+        println!("No annotations on this review task yet.");
+        return;
+    }
+
+    let mut table = new_table();
+    table.set_header(vec!["#", "ID", "State", "Element", "Marks", "Message"]);
+
+    for (i, c) in comments.iter().enumerate() {
+        let state = if matches!(c.status, FeedbackStatus::Resolved) {
+            "done"
+        } else {
+            "open"
+        };
+        let (element, marks) = match &c.pin_anchor {
+            Some(a) => (truncate(&a.selector, 28), a.shapes.len().to_string()),
+            None => ("-".to_string(), "0".to_string()),
+        };
+        table.add_row(vec![
+            Cell::new(i + 1),
+            Cell::new(&c.id),
+            Cell::new(state),
+            Cell::new(element),
+            Cell::new(marks),
+            Cell::new(truncate(&c.message, 48)),
+        ]);
+    }
+
+    println!("{table}");
 }
 
 // ============================================================================

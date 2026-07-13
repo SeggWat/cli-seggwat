@@ -17,7 +17,8 @@ pub(crate) fn build_http_client() -> Result<Client, CliError> {
 use crate::models::{
     ApiError, Feedback, FeedbackCounts, FeedbackCreateRequest, FeedbackListResponse,
     FeedbackUpdateRequest, HelpfulStats, NpsStats, Project, ProjectListResponse, ProjectSummary,
-    Rating, RatingListResponse, StarStats, WhoamiResponse,
+    Rating, RatingListResponse, ReviewTask, ReviewTaskCreateRequest, ReviewTaskListItem,
+    ReviewTaskUpdateRequest, StarStats, WhoamiResponse,
 };
 
 /// Client for the SeggWat REST API.
@@ -49,6 +50,11 @@ impl SeggwatClient {
 
     fn build_http_client() -> Result<Client, CliError> {
         build_http_client()
+    }
+
+    /// The API base URL, including the `/api/v1` suffix.
+    pub fn base_url(&self) -> &str {
+        &self.base_url
     }
 
     async fn handle_response<T: serde::de::DeserializeOwned>(
@@ -283,6 +289,87 @@ impl SeggwatClient {
         let url = format!("{}/projects/{project_id}/ratings/stats/nps", self.base_url);
         let resp = self.auth(self.client.get(&url)).send().await?;
         self.handle_response(resp).await
+    }
+
+    // ========================================================================
+    // Review tasks
+    // ========================================================================
+
+    pub async fn list_review_tasks(
+        &self,
+        project_id: &str,
+        status: Option<&str>,
+    ) -> Result<Vec<ReviewTaskListItem>, CliError> {
+        let url = format!("{}/projects/{project_id}/review-tasks", self.base_url);
+        let mut req = self.auth(self.client.get(&url));
+        if let Some(s) = status {
+            req = req.query(&[("status", s)]);
+        }
+        let resp = req.send().await?;
+        self.handle_response(resp).await
+    }
+
+    pub async fn get_review_task(
+        &self,
+        project_id: &str,
+        task_id: &str,
+    ) -> Result<ReviewTask, CliError> {
+        let url = format!(
+            "{}/projects/{project_id}/review-tasks/{task_id}",
+            self.base_url
+        );
+        let resp = self.auth(self.client.get(&url)).send().await?;
+        self.handle_response(resp).await
+    }
+
+    pub async fn list_review_task_comments(
+        &self,
+        project_id: &str,
+        task_id: &str,
+    ) -> Result<Vec<Feedback>, CliError> {
+        let url = format!(
+            "{}/projects/{project_id}/review-tasks/{task_id}/comments",
+            self.base_url
+        );
+        let resp = self.auth(self.client.get(&url)).send().await?;
+        self.handle_response(resp).await
+    }
+
+    pub async fn create_review_task(
+        &self,
+        project_id: &str,
+        body: &ReviewTaskCreateRequest,
+    ) -> Result<ReviewTask, CliError> {
+        let url = format!("{}/projects/{project_id}/review-tasks", self.base_url);
+        let resp = self.auth(self.client.post(&url)).json(body).send().await?;
+        self.handle_response(resp).await
+    }
+
+    pub async fn update_review_task(
+        &self,
+        project_id: &str,
+        task_id: &str,
+        body: &ReviewTaskUpdateRequest,
+    ) -> Result<ReviewTask, CliError> {
+        let url = format!(
+            "{}/projects/{project_id}/review-tasks/{task_id}",
+            self.base_url
+        );
+        let resp = self.auth(self.client.patch(&url)).json(body).send().await?;
+        self.handle_response(resp).await
+    }
+
+    pub async fn delete_review_task(
+        &self,
+        project_id: &str,
+        task_id: &str,
+    ) -> Result<(), CliError> {
+        let url = format!(
+            "{}/projects/{project_id}/review-tasks/{task_id}",
+            self.base_url
+        );
+        let resp = self.auth(self.client.delete(&url)).send().await?;
+        self.handle_no_content_response(resp).await
     }
 
     // ========================================================================

@@ -5,6 +5,7 @@ mod commands;
 mod error;
 mod models;
 mod output;
+mod serve;
 mod tui;
 
 use anyhow::{Result, bail};
@@ -44,6 +45,12 @@ async fn main() -> Result<()> {
         Commands::Logout => {
             return commands::auth::execute_logout();
         }
+        // The local review loop is account-free — dispatch it before auth.
+        Commands::Review {
+            command: cli::ReviewCommand::Local { command },
+        } => {
+            return commands::review_local::execute(command, json).await;
+        }
         _ => {}
     }
 
@@ -72,6 +79,9 @@ async fn main() -> Result<()> {
         }
         Commands::Rating { command } => {
             commands::rating::execute(&client, command, json).await?;
+        }
+        Commands::Review { command } => {
+            commands::review::execute(&client, command, json).await?;
         }
         Commands::Whoami => {
             commands::auth::execute_whoami(&client, json).await?;
