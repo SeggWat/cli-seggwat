@@ -58,7 +58,7 @@ seggwat project list
 - **Two auth methods** — OAuth login (opens browser) or API key for scripts and CI
 - **JSON output** — `--json` flag for piping to `jq` or other tools
 - **Shell completions** — bash, zsh, fish, PowerShell, elvish
-- **Self-hosted support** — works with custom SeggWat instances via `--api-url`
+- **Review mode** — on-page review tasks and pins, hosted or fully local (no account) via `review local`
 
 ## Commands
 
@@ -168,6 +168,32 @@ seggwat rating stats <project-id> --type star              # Star rating distrib
 seggwat rating stats <project-id> --type nps               # NPS score breakdown
 ```
 
+### Review Commands
+
+On-page review tasks and the pins reviewers leave on them — file a task, have a
+human pin what's wrong on the running app, then read the pins back and fix them.
+
+```bash
+seggwat review list <project-id>                           # List review tasks (--status open|done)
+seggwat review get <project-id> <task-id>                  # Get a task
+seggwat review comments <project-id> <task-id>             # List the pins on a task
+seggwat review create <project-id> -t "Review the pricing page" -d "Check hero + cards"
+seggwat review update <project-id> <task-id> --status done
+seggwat review delete <project-id> <task-id>
+seggwat review resolve <project-id> <feedback-id>          # Mark a pin fixed
+seggwat review reopen  <project-id> <feedback-id>
+seggwat review serve <project-id> --port 7777              # Proxy: pin a localhost app on this project
+```
+
+**Local, no account** — the same loop with no SeggWat account, stored as JSON in `./.review/`:
+
+```bash
+seggwat review local serve                                 # widget server on :7777
+seggwat review local create -t "Review the checkout"       # → task id
+seggwat review local comments <task-id>                    # read the pins
+seggwat review local resolve  <feedback-id>                # mark fixed
+```
+
 ## Authentication
 
 ### OAuth Login (Interactive)
@@ -190,11 +216,7 @@ seggwat --api-key oat_your_key_here project list
 
 Generate API keys in the [SeggWat Dashboard](https://seggwat.com) under Organization Settings.
 
-### Self-Hosted
-
-```bash
-seggwat --api-url https://feedback.yourcompany.com login
-```
+> Pass `--api-url` (or set `SEGGWAT_API_URL`) to point the CLI at a staging or local instance (e.g. `http://localhost:8080`) during development.
 
 ## Shell Completions
 
