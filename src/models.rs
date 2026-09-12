@@ -66,6 +66,7 @@ pub enum FeedbackSource {
     Stripe,
     Polar,
     SocialShare,
+    TestFlight,
 }
 
 impl std::fmt::Display for FeedbackSource {
@@ -77,6 +78,7 @@ impl std::fmt::Display for FeedbackSource {
             FeedbackSource::Stripe => write!(f, "Stripe"),
             FeedbackSource::Polar => write!(f, "Polar"),
             FeedbackSource::SocialShare => write!(f, "Social Share"),
+            FeedbackSource::TestFlight => write!(f, "TestFlight"),
         }
     }
 }
