@@ -256,7 +256,6 @@ pub enum RatingCommand {
 pub enum FeedbackStatusArg {
     New,
     Active,
-    Assigned,
     Hold,
     Closed,
     Resolved,
@@ -267,7 +266,6 @@ impl std::fmt::Display for FeedbackStatusArg {
         match self {
             Self::New => write!(f, "New"),
             Self::Active => write!(f, "Active"),
-            Self::Assigned => write!(f, "Assigned"),
             Self::Hold => write!(f, "Hold"),
             Self::Closed => write!(f, "Closed"),
             Self::Resolved => write!(f, "Resolved"),
@@ -316,7 +314,6 @@ impl FeedbackStatusArg {
         match self {
             Self::New => crate::models::FeedbackStatus::New,
             Self::Active => crate::models::FeedbackStatus::Active,
-            Self::Assigned => crate::models::FeedbackStatus::Assigned,
             Self::Hold => crate::models::FeedbackStatus::Hold,
             Self::Closed => crate::models::FeedbackStatus::Closed,
             Self::Resolved => crate::models::FeedbackStatus::Resolved,

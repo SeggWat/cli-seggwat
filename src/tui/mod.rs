@@ -1429,7 +1429,6 @@ pub fn status_picker_options() -> Vec<FeedbackStatus> {
     vec![
         FeedbackStatus::New,
         FeedbackStatus::Active,
-        FeedbackStatus::Assigned,
         FeedbackStatus::Hold,
         FeedbackStatus::Closed,
         FeedbackStatus::Resolved,
@@ -1442,7 +1441,6 @@ pub fn status_filter_options() -> Vec<Option<FeedbackStatus>> {
         None,
         Some(FeedbackStatus::New),
         Some(FeedbackStatus::Active),
-        Some(FeedbackStatus::Assigned),
         Some(FeedbackStatus::Hold),
         Some(FeedbackStatus::Closed),
         Some(FeedbackStatus::Resolved),
