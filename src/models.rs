@@ -37,7 +37,6 @@ impl std::fmt::Display for FeedbackType {
 pub enum FeedbackStatus {
     New,
     Active,
-    Assigned,
     Hold,
     Closed,
     Resolved,
@@ -48,7 +47,6 @@ impl std::fmt::Display for FeedbackStatus {
         match self {
             FeedbackStatus::New => write!(f, "New"),
             FeedbackStatus::Active => write!(f, "Active"),
-            FeedbackStatus::Assigned => write!(f, "Assigned"),
             FeedbackStatus::Hold => write!(f, "Hold"),
             FeedbackStatus::Closed => write!(f, "Closed"),
             FeedbackStatus::Resolved => write!(f, "Resolved"),
@@ -66,6 +64,15 @@ pub enum FeedbackSource {
     Stripe,
     Polar,
     SocialShare,
+    TestFlight,
+    AppStore,
+    Nps,
+    Survey,
+    Agent,
+    AgentReport,
+    /// Any source this CLI version doesn't know yet; keeps listing working.
+    #[serde(other)]
+    Unknown,
 }
 
 impl std::fmt::Display for FeedbackSource {
@@ -77,6 +84,13 @@ impl std::fmt::Display for FeedbackSource {
             FeedbackSource::Stripe => write!(f, "Stripe"),
             FeedbackSource::Polar => write!(f, "Polar"),
             FeedbackSource::SocialShare => write!(f, "Social Share"),
+            FeedbackSource::TestFlight => write!(f, "TestFlight"),
+            FeedbackSource::AppStore => write!(f, "App Store"),
+            FeedbackSource::Nps => write!(f, "NPS"),
+            FeedbackSource::Survey => write!(f, "Survey"),
+            FeedbackSource::Agent => write!(f, "Browser Agent"),
+            FeedbackSource::AgentReport => write!(f, "Agent Report"),
+            FeedbackSource::Unknown => write!(f, "Unknown"),
         }
     }
 }
@@ -376,4 +390,26 @@ pub struct WhoamiResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub org_name: Option<String>,
     pub role: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn feedback_source_accepts_server_variants_and_unknowns() {
+        assert_eq!(
+            serde_json::from_str::<FeedbackSource>("\"AgentReport\"").unwrap(),
+            FeedbackSource::AgentReport
+        );
+        assert_eq!(
+            serde_json::from_str::<FeedbackSource>("\"NotYetKnown\"").unwrap(),
+            FeedbackSource::Unknown
+        );
+    }
+
+    #[test]
+    fn feedback_status_has_no_assigned() {
+        assert!(serde_json::from_str::<FeedbackStatus>("\"Assigned\"").is_err());
+    }
 }

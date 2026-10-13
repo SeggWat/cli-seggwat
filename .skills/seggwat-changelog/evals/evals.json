@@ -1,0 +1,23 @@
+{
+  "skill_name": "seggwat-changelog",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We just tagged v1.4.0. Write the SeggWat changelog for it from the commits since the last tag. Project is \"Acme Web\".",
+      "expected_output": "Should resolve the project with list_projects, call list_changelog first and check no entry already has version v1.4.0, find the previous tag with git describe --tags --abbrev=0 \"v1.4.0^\", read git log for the range, drop chore/ci/docs/test commits, write customer-facing prose (no hashes or ticket ids), create one draft per user-facing change via create_changelog_entry with title, Markdown body, version \"v1.4.0\" and a valid category (added/improved/fixed/changed/removed/security), never pass publish: true, and show the drafts asking whether to publish.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Looks good, publish the v1.4.0 notes. Also the PNG upload fix closed feedback 66f1c0a2e4b0c9d1a2b3c4d5, mark that as done.",
+      "expected_output": "Should call set_changelog_status with status \"published\" for each v1.4.0 draft entry, then get_feedback to confirm the item, warn that setting Resolved emails the submitter, and call update_feedback with status Resolved and an end-user-friendly resolution_note mentioning v1.4.0 (no internal ids or invented URLs).",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Set up a GitHub Action so every time we push a v* tag, Claude drafts our SeggWat changelog automatically.",
+      "expected_output": "Should give a workflow on push tags ['v*'] with checkout fetch-depth: 0, Claude Code install, ANTHROPIC_API_KEY and SEGGWAT_API_KEY secrets, an MCP config pointing at https://seggwat.com/mcp with Authorization: Bearer header, and claude -p using the seggwat-changelog skill with --allowedTools limited to git describe/log and mcp__seggwat__list_projects / list_changelog / create_changelog_entry so CI cannot publish. Should note the skill must be committed under .claude/skills/ and that the CLI has no changelog commands.",
+      "files": []
+    }
+  ]
+}

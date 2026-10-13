@@ -950,7 +950,6 @@ fn short_status(s: &FeedbackStatus) -> &'static str {
     match s {
         FeedbackStatus::New => "NEW",
         FeedbackStatus::Active => "ACTIVE",
-        FeedbackStatus::Assigned => "ASSIGN",
         FeedbackStatus::Hold => "HOLD",
         FeedbackStatus::Closed => "CLOSED",
         FeedbackStatus::Resolved => "RESOLV",
@@ -961,7 +960,6 @@ fn status_style(s: &FeedbackStatus) -> Style {
     match s {
         FeedbackStatus::New => Style::default().fg(Color::Cyan),
         FeedbackStatus::Active => Style::default().fg(Color::Yellow),
-        FeedbackStatus::Assigned => Style::default().fg(Color::Blue),
         FeedbackStatus::Hold => Style::default().fg(Color::Magenta),
         FeedbackStatus::Closed => Style::default().fg(Color::DarkGray),
         FeedbackStatus::Resolved => Style::default().fg(Color::Green),

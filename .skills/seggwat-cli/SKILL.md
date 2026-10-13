@@ -86,7 +86,7 @@ seggwat feedback delete <project-id> <feedback-id>
 seggwat feedback stats <project-id>
 ```
 
-**Feedback statuses:** `new`, `active`, `assigned`, `hold`, `closed`, `resolved`
+**Feedback statuses:** `new`, `active`, `hold`, `closed`, `resolved`
 
 **Feedback types:** `bug`, `feature`, `praise`, `question`, `improvement`, `other`
 
