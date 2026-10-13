@@ -52,8 +52,8 @@ From a tag:
 
 ```bash
 TAG=v1.4.0
-PREV=$(git describe --tags --abbrev=0 "$TAG^")
-git log --no-merges --format='%h %s%n%b' "$PREV..$TAG"
+PREV=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null)   # empty on the first release
+git log --no-merges --format='%h %s%n%b' "${PREV:+$PREV..}$TAG"
 ```
 
 No tag yet: start from the newest **published** entry's `published_at` in `list_changelog`:
@@ -149,7 +149,7 @@ Write the note for the end user. Don't paste an internal id or a link you haven'
 ## Rules
 
 - **Always draft first.** Never use `publish: true`, and never call `set_changelog_status` with `published` without an explicit instruction.
-- **Check before creating.** Before writing anything, read `list_changelog`. An existing entry for the version means you update that entry instead of creating new ones.
+- **Check before creating.** Before writing anything, read `list_changelog`. An existing entry for the version means you update that entry instead of creating new ones. Only update drafts; a published entry changes only when the user asks for it.
 - **One release block per version.** Every entry for a release shares `version` (and `component`).
 - **Customer prose only.** Commit messages are input, not output.
 - **Resolve feedback only after publishing, and only with confirmation.** It sends email.
@@ -188,6 +188,7 @@ jobs:
           SEGGWAT_API_KEY: ${{ secrets.SEGGWAT_API_KEY }}
           TAG: ${{ github.ref_name }}
         run: |
+          set -o pipefail
           cat > "$RUNNER_TEMP/mcp.json" <<EOF
           {"mcpServers":{"seggwat":{"type":"http","url":"https://seggwat.com/mcp",
             "headers":{"Authorization":"Bearer ${SEGGWAT_API_KEY}"}}}}
@@ -205,7 +206,7 @@ jobs:
             || { echo "::error::Claude never called a SeggWat MCP tool: check the MCP connection and SEGGWAT_API_KEY"; exit 1; }
 ```
 
-`set_changelog_status` and `update_feedback` are left off the allow list, so CI can't publish or send email even if asked. A human reviews the drafts in the dashboard, or asks Claude to "publish the v1.4.0 notes".
+`set_changelog_status` and `update_feedback` are left off the allow list, so CI can't flip an entry to published or send email even if asked. `create_changelog_entry` still accepts `publish: true`; this skill never sets it, and the prompt says drafts only. A human reviews the drafts in the dashboard, or asks Claude to "publish the v1.4.0 notes".
 
 The last `jq` is the safety net: a headless run prints a polite "the tools aren't available" message and exits 0 when the MCP server is unreachable or returns no tools, so without it the job goes green with nothing drafted. If the gate fires, rerun with `--debug='mcp' --debug-file "$RUNNER_TEMP/mcp.log"` and look for `Failed to fetch tools`.
 
