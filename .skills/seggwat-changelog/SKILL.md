@@ -44,7 +44,7 @@ list_changelog { "project_id": "<id>" }
 list_changelog { "project_id": "<id>", "component": "cli" }   # monorepo with components
 ```
 
-`list_changelog` returns every status, newest first. **If any entry already has this `version`** (and component), don't create new ones. Common case: the project syncs GitHub releases, so a `github_release` draft for the tag already exists. Offer to rewrite that entry with `update_changelog_entry` instead.
+`list_changelog` returns every status, newest first. **If entries already exist for this `version`** (and component), reconcile per change: update the draft that covers a change with `update_changelog_entry`, create entries only for changes that have none, and never create a second entry for the same change. That way a rerun after a partial failure completes the release instead of duplicating it. Common case: the project syncs GitHub releases, so a `github_release` draft for the tag already exists; rewrite it to cover the first change. Only touch drafts; a published entry changes only when the user asks.
 
 ### 2. Pick the range
 
@@ -52,9 +52,11 @@ From a tag:
 
 ```bash
 TAG=v1.4.0
-PREV=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null)   # empty on the first release
+PREV=$(git describe --tags --abbrev=0 --match 'v*' "$TAG^" 2>/dev/null)   # empty on the first release
 git log --no-merges --format='%h %s%n%b' "${PREV:+$PREV..}$TAG"
 ```
+
+`--match` keeps tags of other products in a monorepo from shortening the range. For component-prefixed tags such as `cli-v1.4.0`, use `--match 'cli-v*'` and set `version` to the part after the prefix (`v1.4.0`).
 
 No tag yet: start from the newest **published** entry's `published_at` in `list_changelog`:
 
@@ -149,7 +151,7 @@ Write the note for the end user. Don't paste an internal id or a link you haven'
 ## Rules
 
 - **Always draft first.** Never use `publish: true`, and never call `set_changelog_status` with `published` without an explicit instruction.
-- **Check before creating.** Before writing anything, read `list_changelog`. An existing entry for the version means you update that entry instead of creating new ones. Only update drafts; a published entry changes only when the user asks for it.
+- **Check before creating.** Before writing anything, read `list_changelog`. Existing entries for the version are reconciled per change: update the matching draft, create only what is missing, never duplicate. Only update drafts; a published entry changes only when the user asks for it.
 - **One release block per version.** Every entry for a release shares `version` (and `component`).
 - **Customer prose only.** Commit messages are input, not output.
 - **Resolve feedback only after publishing, and only with confirmation.** It sends email.
