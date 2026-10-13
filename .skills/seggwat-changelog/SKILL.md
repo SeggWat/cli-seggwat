@@ -157,7 +157,7 @@ Write the note for the end user. Don't paste an internal id or a link you haven'
 
 ## Automate on release tags
 
-This runs on every `v*` tag and leaves drafts for a human to publish. Commit this skill at `.claude/skills/seggwat-changelog/SKILL.md` so headless Claude Code finds it. Add the `ANTHROPIC_API_KEY` and `SEGGWAT_API_KEY` repository secrets.
+This runs on every `v*` tag and leaves drafts for a human to publish. Install the skill into the repo (`npx skills add SeggWat/cli-seggwat --skill seggwat-changelog` lands it in `.agents/skills/` with a `.claude/skills/` symlink) and commit it so headless Claude Code finds it. Add the `SEGGWAT_API_KEY` repository secret plus `ANTHROPIC_API_KEY`, or `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` to bill a Claude subscription instead.
 
 ```yaml
 # .github/workflows/changelog-draft.yml
@@ -194,11 +194,20 @@ jobs:
           EOF
           claude -p "Use the seggwat-changelog skill to draft changelog entries for tag $TAG in SeggWat project \"Acme Web\". Drafts only: do not publish and do not update feedback." \
             --mcp-config "$RUNNER_TEMP/mcp.json" \
+            --output-format stream-json --verbose \
             --allowedTools "Bash(git describe:*)" "Bash(git log:*)" "Bash(git tag:*)" \
-              "mcp__seggwat__list_projects" "mcp__seggwat__list_changelog" "mcp__seggwat__create_changelog_entry"
+              "mcp__seggwat__list_projects" "mcp__seggwat__list_changelog" \
+              "mcp__seggwat__create_changelog_entry" "mcp__seggwat__update_changelog_entry" \
+            | tee "$RUNNER_TEMP/out.jsonl" | jq -r 'select(.type=="result") | .result'
+          # Fail the run if Claude never reached the SeggWat MCP server.
+          jq -e 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use" and (.name|startswith("mcp__seggwat__")))' \
+            "$RUNNER_TEMP/out.jsonl" >/dev/null \
+            || { echo "::error::Claude never called a SeggWat MCP tool: check the MCP connection and SEGGWAT_API_KEY"; exit 1; }
 ```
 
 `set_changelog_status` and `update_feedback` are left off the allow list, so CI can't publish or send email even if asked. A human reviews the drafts in the dashboard, or asks Claude to "publish the v1.4.0 notes".
+
+The last `jq` is the safety net: a headless run prints a polite "the tools aren't available" message and exits 0 when the MCP server is unreachable or returns no tools, so without it the job goes green with nothing drafted. If the gate fires, rerun with `--debug='mcp' --debug-file "$RUNNER_TEMP/mcp.log"` and look for `Failed to fetch tools`.
 
 ## Worked example
 
